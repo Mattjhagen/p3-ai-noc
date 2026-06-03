@@ -3,15 +3,12 @@ import time
 import psutil
 
 def format_bytes(bytes_num: float) -> str:
-    """Formats bytes into human-readable strings (e.g. 1.3TB, 45.2GB)."""
+    """Formats bytes into human-readable strings (e.g. 1.3 TB, 45.2 GB)."""
     for unit in ['B', 'KB', 'MB', 'GB', 'TB', 'PB']:
         if bytes_num < 1024.0:
-            # If it's B, return integer, else 1 decimal place
             if unit == 'B':
                 return f"{int(bytes_num)} {unit}"
-            # For larger units like TB/GB, format to 1 decimal place (e.g. 1.3 TB)
             return f"{bytes_num:.1f} {unit}"
-            # Or without space: return f"{bytes_num:.1f}{unit}"
         bytes_num /= 1024.0
     return f"{bytes_num:.1f} EB"
 
@@ -70,6 +67,33 @@ class SystemService:
         boot_time = psutil.boot_time()
         uptime_seconds = time.time() - boot_time
 
+        # CPU Temperature
+        cpu_temp = None
+        try:
+            temps = psutil.sensors_temperatures()
+            if temps:
+                # Look for coretemp, cpu_thermal, or acpitz sensors
+                for name in ('coretemp', 'cpu_thermal', 'acpitz'):
+                    if name in temps:
+                        entries = temps[name]
+                        for entry in entries:
+                            if entry.current > 0:
+                                cpu_temp = entry.current
+                                break
+                    if cpu_temp:
+                        break
+                # Fallback to any sensor that reports > 0
+                if not cpu_temp:
+                    for entries in temps.values():
+                        for entry in entries:
+                            if entry.current > 0:
+                                cpu_temp = entry.current
+                                break
+                        if cpu_temp:
+                            break
+        except Exception:
+            pass
+
         # Top 5 memory-consuming processes
         top_processes = []
         for proc in psutil.process_iter(['pid', 'name', 'memory_info', 'memory_percent']):
@@ -107,5 +131,6 @@ class SystemService:
             "load_15m": load_15m,
             "uptime_seconds": uptime_seconds,
             "uptime_str": format_uptime(uptime_seconds),
+            "cpu_temp": cpu_temp,
             "top_processes": top_processes
         }

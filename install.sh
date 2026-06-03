@@ -4,7 +4,7 @@ set -e
 # Get absolute path of script directory
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-echo "Installing r510-noc operations dashboard..."
+echo "Installing P3 AI NOC persistent TUI dashboard..."
 echo "Repository directory: $REPO_DIR"
 
 # 1. Check Python version
@@ -24,14 +24,14 @@ echo "Installing dependencies..."
 "$REPO_DIR/.venv/bin/pip" install --upgrade pip
 "$REPO_DIR/.venv/bin/pip" install -r "$REPO_DIR/requirements.txt"
 
-# 4. Create launcher script
-LAUNCHER_PATH="/usr/local/bin/r510-status"
+# 4. Install the launcher script p3ainoc
+LAUNCHER_PATH="/usr/local/bin/p3ainoc"
 echo "Creating launcher at $LAUNCHER_PATH..."
 
 TEMP_LAUNCHER=$(mktemp)
 cat <<EOF > "$TEMP_LAUNCHER"
 #!/bin/bash
-# r510-status launcher script
+# p3ainoc launcher script
 export PYTHONIOENCODING=utf-8
 exec "$REPO_DIR/.venv/bin/python" "$REPO_DIR/dashboard.py" "\$@"
 EOF
@@ -49,18 +49,31 @@ fi
 
 rm "$TEMP_LAUNCHER"
 
+# 5. Make sure local scripts/p3ainoc is synchronized
+mkdir -p "$REPO_DIR/scripts"
+cp "$LAUNCHER_PATH" "$REPO_DIR/scripts/p3ainoc"
+
 # Ensure data directory exists and is writeable
 mkdir -p "$REPO_DIR/data"
 chmod 777 "$REPO_DIR/data" || true
 
+# 6. Install systemd service
+SERVICE_PATH="/etc/systemd/system/p3-ai-noc.service"
+if [ -d "/etc/systemd/system" ]; then
+    echo "Registering systemd service at $SERVICE_PATH..."
+    if [ -w "/etc/systemd/system" ]; then
+        cp "$REPO_DIR/p3-ai-noc.service" "$SERVICE_PATH"
+    else
+        sudo cp "$REPO_DIR/p3-ai-noc.service" "$SERVICE_PATH"
+    fi
+    echo "Systemd service file copied."
+    echo "To run the dashboard as a service on tty2, execute:"
+    echo "  sudo systemctl daemon-reload"
+    echo "  sudo systemctl enable p3-ai-noc.service"
+    echo "  sudo systemctl start p3-ai-noc.service"
+fi
+
 echo "========================================================"
 echo "Installation complete!"
-echo "You can now run 'r510-status' in your terminal."
-echo ""
-echo "To automatically display the dashboard upon SSH login,"
-echo "add the following snippet to the end of your ~/.bashrc:"
-echo ""
-echo 'if [ -n "$SSH_CONNECTION" ]; then'
-echo '    r510-status'
-echo 'fi'
+echo "You can now run 'p3ainoc' to open the full-screen TUI."
 echo "========================================================"

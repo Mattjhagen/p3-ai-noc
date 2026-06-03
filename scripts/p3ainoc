@@ -1,0 +1,5 @@
+#!/bin/bash
+# p3ainoc launcher script for R510 NOC Dashboard
+cd /home/matty/p3-ai-noc
+source .venv/bin/activate
+python3 dashboard.py

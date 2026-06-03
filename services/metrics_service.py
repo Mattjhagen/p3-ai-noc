@@ -171,24 +171,16 @@ class MetricsService:
                 """, (new_last_cursor,))
 
         return True, None
-
     def get_metrics(self):
         """
         Retrieves aggregated stats from SQLite DB.
-        Returns:
-            {
-                "total_requests": int,
-                "requests_today": int,
-                "avg_latency_ms": float or None,
-                "failures": int,
-                "last_request_time": str or None
-            }
         """
         stats = {
             "total_requests": 0,
             "requests_today": 0,
             "avg_latency_ms": None,
             "failures": 0,
+            "failures_today": 0,
             "last_request_time": None
         }
 
@@ -200,7 +192,6 @@ class MetricsService:
             stats["total_requests"] = cursor.fetchone()[0]
 
             # Requests today (local timezone midnight start)
-            # Find start of today in UTC to query ISO-stored timestamps
             local_now = datetime.now()
             local_today_start = datetime(local_now.year, local_now.month, local_now.day)
             utc_today_start = local_today_start.astimezone(timezone.utc)
@@ -208,14 +199,18 @@ class MetricsService:
             cursor.execute("SELECT COUNT(*) FROM requests WHERE timestamp >= ?", (utc_today_start.isoformat(),))
             stats["requests_today"] = cursor.fetchone()[0]
 
-            # Average latency (only of requests that had latency parsed)
+            # Average latency
             cursor.execute("SELECT AVG(latency_ms) FROM requests WHERE latency_ms IS NOT NULL")
             val = cursor.fetchone()[0]
             stats["avg_latency_ms"] = float(val) if val is not None else None
 
-            # Failures (status >= 400)
+            # Total Failures (status >= 400)
             cursor.execute("SELECT COUNT(*) FROM requests WHERE status_code >= 400")
             stats["failures"] = cursor.fetchone()[0]
+
+            # Failures today (status >= 400 since midnight)
+            cursor.execute("SELECT COUNT(*) FROM requests WHERE status_code >= 400 AND timestamp >= ?", (utc_today_start.isoformat(),))
+            stats["failures_today"] = cursor.fetchone()[0]
 
             # Last request time
             cursor.execute("SELECT timestamp FROM requests ORDER BY timestamp DESC LIMIT 1")
@@ -226,7 +221,6 @@ class MetricsService:
             pass
 
         return stats
-
     def get_active_requests(self, port=11434):
         """
         Estimates active/established TCP connections to Ollama's port.
