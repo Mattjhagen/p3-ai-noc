@@ -30,7 +30,7 @@ cat <<'EOF' > "$TEMP_TTY1"
 #!/bin/bash
 # Kiosk TTY1: Auto-login matty and launch p3noc
 echo "Starting TTY1 Kiosk (p3noc)..."
-exec su - matty -c "cd /opt/p3-noc && source .venv/bin/activate && p3noc"
+exec su - matty -c "p3noc"
 EOF
 
 TEMP_TTY2=$(mktemp)
@@ -38,10 +38,11 @@ cat <<'EOF' > "$TEMP_TTY2"
 #!/bin/bash
 # Kiosk TTY2: Auto-login matty and SSH to R510 to run p3ainoc
 while true; do
-    echo "Connecting to R510 (192.168.1.47)..."
-    su - matty -c "ssh -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -t matty@192.168.1.47 'cd ~/p3-ai-noc && source .venv/bin/activate && p3ainoc'"
-    echo "SSH connection closed or dropped. Reconnecting in 5 seconds..."
-    sleep 5
+  su - matty -c 'ssh -o ConnectTimeout=5 -o ServerAliveInterval=30 \
+      -o ServerAliveCountMax=3 \
+      -t matty@192.168.1.47 \
+      "p3ainoc"'
+  sleep 5
 done
 EOF
 
